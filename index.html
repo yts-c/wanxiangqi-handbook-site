@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#142c2b">
+  <meta name="description" content="查棋手、棋子、装备与流派，理解每条联动的触发、条件与版本。">
+  <title>万象棋手册 · 每一手都有思路</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./app.js" type="module"></script>
+</head>
+<body>
+  <a class="skip-link" href="#content">跳到手册内容</a>
+  <aside class="sidebar">
+    <a class="brand" href="#"><span class="brand-symbol" aria-hidden="true">象</span><span>万象棋手册<small>WANXIANG FIELD GUIDE</small></span></a>
+    <div class="nav-label">你的对局，随手查</div>
+    <nav id="side-nav" aria-label="图鉴分类"></nav>
+    <div class="sidebar-note"><span class="note-star" aria-hidden="true">✧</span><p>先看条件，再补下一张。<small>从棋子出发，找到成长、装备和阵容之间的联系。</small></p></div>
+    <div class="sidebar-bottom"><span class="live-dot"></span>v1.6.1 资料草案<small>核对至 2026.10.15</small></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar"><a href="#" class="mobile-brand">◈ 万象棋手册</a><span class="breadcrumb">玩家手册 <span>/</span> <b id="breadcrumb-current">全部内容</b></span><a href="#type=playstyle" class="topbar-link">从流派开始 <span aria-hidden="true">↗</span></a></header>
+    <main id="content" tabindex="-1">
+      <section class="intro" id="intro">
+        <div class="intro-copy"><div class="eyebrow"><span></span> 王者万象棋 · 玩家速查</div><h1>把每一手，<br>想明白。</h1><p>遇到一张牌，找到它的用法。<br class="desktop-break">让成长、装备与联动，连成你的下一步。</p><div class="intro-meta"><span>版本 v1.6.1</span><span>规则与玩法分开核对</span></div></div>
+        <div class="strategy-art" aria-label="牺牲李信联动示意，明世隐按额度将临时等级转为永久">
+          <div class="board-grid"></div><div class="art-orbit"></div><div class="art-kicker">一张牌，也有很多可能</div>
+          <div class="chess-token token-left"><span>钟</span><small>牺牲来源</small></div><div class="chess-token token-core"><span>信</span><small>临时成长</small></div><div class="chess-token token-right"><span>隐</span><small>额度内转换</small></div>
+          <span class="art-connector connector-one">→</span><span class="art-connector connector-two">→</span><div class="art-caption">先看触发 <i>·</i> 再看收益给谁</div>
+        </div>
+      </section>
+      <section class="catalog" aria-labelledby="catalog-heading">
+        <div class="section-heading"><div><span class="eyebrow mini">FIELD NOTES / 速查目录</span><h2 id="catalog-heading">这一手，你想查什么？</h2></div><span id="catalog-total" class="total-label"></span></div>
+        <form id="search-form" role="search"><label class="search-box" for="search"><span class="sr-only">搜索名称或机制</span><span class="search-icon" aria-hidden="true"></span><input id="search" type="search" placeholder="搜索棋子、装备、天赋，或「破盾」「整备」…" autocomplete="off"><span class="search-hint" aria-hidden="true">/</span></label></form>
+        <div id="quick-searches" class="quick-searches"><span>试试搜</span><button type="button" data-query="李信">李信</button><button type="button" data-query="破盾">破盾</button><button type="button" data-query="整备">整备</button><button type="button" data-query="蒙恬">蒙恬</button></div>
+        <div id="type-tabs" class="type-tabs" role="group" aria-label="内容分类"></div>
+        <div class="filter-bar"><p id="result-status" role="status" aria-live="polite">正在打开手册…</p><div id="hero-filters" class="hero-filters" hidden><label>阵营<select id="faction"><option value="">全部阵营</option></select></label><label>品阶<select id="quality"><option value="">全部品阶</option><option value="1">1阶</option><option value="2">2阶</option><option value="3">3阶</option><option value="4">4阶</option><option value="5">5阶</option></select></label></div><button id="reset" class="text-button" type="button" hidden>清除筛选</button></div>
+        <div id="results" class="card-grid"></div>
+        <div id="empty" class="empty-state" hidden><span aria-hidden="true">⌕</span><h3>暂时没有找到这条内容</h3><p>可以缩短关键词，或清除分类与阵营筛选后再查。</p><button id="empty-reset" class="primary-button" type="button">查看全部内容</button></div>
+        <div id="load-error" class="empty-state" hidden><h3>资料暂时没有打开</h3><p>请重试加载；已整理的版本和来源会随资料一同显示。</p><button id="retry" class="primary-button" type="button">重新加载</button></div>
+        <button id="load-more" class="load-more" type="button" hidden>继续查看 <span aria-hidden="true">↓</span></button>
+      </section>
+      <footer class="page-footer"><span>万象之中，自有思路。</span><p>非官方玩家资料手册 · 按 v1.6.1 公告与公开卡面整理<br>玩法建议尚待实战与独立试读，待核内容在详情中标明。</p></footer>
+    </main>
+  </div>
+  <dialog id="detail" aria-labelledby="detail-title"><div class="detail-toolbar"><button id="detail-back" class="text-button" type="button">← 返回查阅</button><button id="detail-close" class="close-button" aria-label="关闭详情" type="button">×</button></div><article id="detail-article"></article></dialog>
+</body>
+</html>

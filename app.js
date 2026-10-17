@@ -24,12 +24,35 @@ function paintNavigation() {
   $('#breadcrumb-current').textContent = typeInfo(route.type).label;
 }
 
+const fitPriority = { '先补': 0, '成型后选': 1, '配套再选': 2 };
+function fitHeroTiles(items, compact = false) {
+  return `<div class="fit-heroes${compact ? ' compact' : ''}">${items.map(item => {
+    const hero = entryMap.get(item.entryId);
+    return hero ? `<a href="${escapeHtml(detailLink(hero.id))}" data-entry="${escapeHtml(hero.id)}">${imageMarkup(hero)}<strong>${escapeHtml(hero.name)}</strong><span>${escapeHtml(item.reason)}</span>${!compact && item.condition ? `<small>${escapeHtml(item.condition)}</small>` : ''}</a>` : '';
+  }).join('')}</div>`;
+}
+function flowGearMarkup(entry) {
+  if (!entry.gearOptions?.length) return '';
+  const options = [...entry.gearOptions].sort((a,b) => fitPriority[a.priority] - fitPriority[b.priority]).slice(0,4);
+  return `<section class="flow-artifacts"><h2>神器与天赋装，先补什么？</h2><p>先补当前短板；以本局实际提供的装备为准。</p><div class="flow-gear-grid">${options.map(option => {
+    const equipment = entryMap.get(option.entryId);
+    return `<a href="${escapeHtml(detailLink(equipment.id))}" data-entry="${escapeHtml(equipment.id)}">${imageMarkup(equipment)}<div><small>${escapeHtml(option.priority)}</small><strong>${escapeHtml(equipment.name)}</strong><span>给${escapeHtml(option.give_to)} · ${escapeHtml(option.condition)}</span></div></a>`;
+  }).join('')}</div><a class="fit-all-link" href="${escapeHtml(routeHash({type:'artifact',q:entry.quick.title}))}" data-fit-query="${escapeHtml(entry.quick.title)}">查看这套流派的全部适配装备 →</a></section>`;
+}
+
 function card(entry) {
   const info = typeInfo(entry.type);
   if (entry.quick) {
     const q = entry.quick;
     const portraits = q.core.map(item => ({ ...item, target: entryMap.get(item.entryId) })).filter(item => item.target);
     return `<article class="entry-card quick-card" data-type="${entry.type}"><div class="quick-card-label">${entry.type === 'playstyle' ? '一图流 · 运营路线' : '图解 · 小配合'}<span aria-hidden="true">↗</span></div><h3 class="card-title"><a href="${escapeHtml(detailLink(entry.id))}" data-entry="${escapeHtml(entry.id)}">${escapeHtml(q.title)}</a></h3><p class="quick-card-tagline">${escapeHtml(q.tagline)}</p><div class="quick-card-portraits">${portraits.map(item => `<a href="${escapeHtml(detailLink(item.target.id))}" data-entry="${escapeHtml(item.target.id)}">${imageMarkup(item.target)}<span>${escapeHtml(item.name)}</span><small>${escapeHtml(item.role)}</small></a>`).join('')}</div><div class="quick-card-engine">${q.engine.map(escapeHtml).join('<span aria-hidden="true"> → </span>')}</div><a class="quick-card-open" href="${escapeHtml(detailLink(entry.id))}" data-entry="${escapeHtml(entry.id)}">${entry.type === 'playstyle' ? '看核心与三步运营' : '看出牌顺序与站位'} <span aria-hidden="true">→</span></a></article>`;
+  }
+  if (entry.fit) {
+    const f = entry.fit;
+    const matched = f.playstyles.find(style => route.q && style.name.includes(route.q));
+    const fitHeroes = matched?.give_to ? [...f.use_for].sort((a,b)=>Number(b.hero===matched.give_to)-Number(a.hero===matched.give_to)) : f.use_for;
+    const avoid = f.avoid.find(item => route.q && item.hero === route.q);
+    return `<article class="entry-card fit-card" data-type="equipment"><div class="card-top">${imageMarkup(entry)}<div><span class="fit-kind">${f.kind === 'artifact' ? '金色神器' : '天赋装备'}${f.ruleSource === '社区卡面待核' ? ' · 社区待核' : ''}</span><h3 class="card-title"><a href="${escapeHtml(detailLink(entry.id))}" data-entry="${escapeHtml(entry.id)}">${escapeHtml(entry.name)}</a></h3></div></div><p class="fit-effect">${escapeHtml(f.summary)}</p>${fitHeroTiles(fitHeroes.slice(0,3),true)}<p class="fit-take"><strong>${avoid ? '先别给'+escapeHtml(avoid.hero) : matched ? escapeHtml(matched.priority+' · 给'+matched.give_to) : '适合拿的时机'}</strong>${escapeHtml(avoid?.reason || matched?.condition || f.take_when)}</p><a class="quick-card-open" href="${escapeHtml(detailLink(entry.id))}" data-entry="${escapeHtml(entry.id)}">看适配与避坑 <span>→</span></a></article>`;
   }
   const glyph = entry.type === 'equipment' ? '器' : entry.type === 'combo' ? '联' : entry.type === 'playstyle' ? '阵' : entry.name.charAt(0);
   const subtitle = entry.subtitle || [entry.faction, entry.quality ? `${entry.quality}阶` : '', info.short].filter(Boolean).join(' · ');
@@ -89,9 +112,19 @@ function renderDetail() {
   }
   const sources = (entry.sources || []).filter(source => safeExternalUrl(source.url));
   const related = (entry.related || []).map(id => entryMap.get(id)).filter(Boolean);
+  if (entry.fit) {
+    const f = entry.fit;
+    dialog.classList.remove('is-quick-guide');
+    const body = markdownToHtml(entry.body, { resolveLink: resolveLocalLink, linkText: text => linkBodyText(text, entry) });
+    $('#detail-article').innerHTML = `<div class="detail-category">${f.kind === 'artifact' ? '金色神器' : '天赋装备'} / 给谁 · 何时拿</div><div class="fit-detail-heading">${imageMarkup(entry)}<div><h1 id="detail-title" class="detail-heading">${escapeHtml(entry.name)}</h1><p>${escapeHtml(f.summary)}</p></div></div><p class="fit-basis">${escapeHtml(f.ruleSource)} · 适配按机制推导，非实战排名</p><section class="fit-section"><h2>拿到先看这些英雄</h2>${fitHeroTiles(f.use_for)}</section><section class="fit-section fit-window"><h2>什么时候值得选</h2><p>${escapeHtml(f.take_when)}</p></section>${f.playstyles.length ? `<section class="fit-section"><h2>哪些流派可以拿</h2><div class="fit-style-list">${f.playstyles.map(style => `<a href="${escapeHtml(detailLink(style.id))}" data-entry="${escapeHtml(style.id)}"><span class="fit-priority">${escapeHtml(style.priority)}</span><div><strong>${escapeHtml(style.name)}</strong><p>给${escapeHtml(style.give_to)} · ${escapeHtml(style.reason)}</p><small>${escapeHtml(style.condition)}</small></div><span aria-hidden="true">↗</span></a>`).join('')}</div></section>` : '<p class="source-note">现有11套流派没有足够依据列为优先选；按适配英雄和代价判断。</p>'}${f.avoid.length ? `<section class="fit-section"><h2>这些英雄先别急着带</h2>${fitHeroTiles(f.avoid)}</section>` : ''}<aside class="quick-caution"><span aria-hidden="true">!</span><p><strong>选之前看代价</strong>${escapeHtml(f.beware)}</p></aside><details class="full-guide"><summary>装备完整效果与获取条件</summary><div class="reader">${body}</div>${entry.gaps?.length ? `<ul class="gap-list">${entry.gaps.map(gap=>`<li>${escapeHtml(gap)}</li>`).join('')}</ul>`:''}<ul class="source-list">${sources.map(source=>`<li><a href="${escapeHtml(safeExternalUrl(source.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.label || '查看原文')} ↗</a></li>`).join('')}</ul></details>`;
+    dialog.scrollTop=0;
+    $('#detail-close').focus({preventScroll:true});
+    document.title=`${entry.name}给谁用 · 万象棋手册`;
+    return;
+  }
   if (entry.quick) {
     const body = markdownToHtml(entry.body, { resolveLink: resolveLocalLink, linkText: text => linkBodyText(text, entry) });
-    $('#detail-article').innerHTML = `<div class="detail-category">${entry.type === 'playstyle' ? '流派一图流' : '联动图解'} / QUICK PLAY</div><h1 id="detail-title" class="detail-heading">${escapeHtml(entry.quick.title)}</h1><p class="quick-tagline">${escapeHtml(entry.quick.tagline)}</p>${quickGuideMarkup(entry, { lookup: id => entryMap.get(id), href: detailLink })}<details class="full-guide"><summary>展开完整攻略与规则 <span>需要细节时再看 ↓</span></summary><div class="reader">${body}</div></details><details class="full-guide evidence-guide"><summary>来源与待核条件 <span>查原文 ↓</span></summary>${entry.gaps?.length ? `<ul class="gap-list">${entry.gaps.map(gap => `<li>${escapeHtml(gap)}</li>`).join('')}</ul>` : ''}<ul class="source-list">${sources.map(source => `<li><a href="${escapeHtml(safeExternalUrl(source.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.label || '查看原文')} ↗</a></li>`).join('')}</ul><p class="source-note">图中素材出处可在对应棋子、装备及天赋详情中查看。配队建议待实战与独立试读。</p></details>`;
+    $('#detail-article').innerHTML = `<div class="detail-category">${entry.type === 'playstyle' ? '流派一图流' : '联动图解'} / QUICK PLAY</div><h1 id="detail-title" class="detail-heading">${escapeHtml(entry.quick.title)}</h1><p class="quick-tagline">${escapeHtml(entry.quick.tagline)}</p>${quickGuideMarkup(entry, { lookup: id => entryMap.get(id), href: detailLink })}${flowGearMarkup(entry)}<details class="full-guide"><summary>展开完整攻略与规则 <span>需要细节时再看 ↓</span></summary><div class="reader">${body}</div></details><details class="full-guide evidence-guide"><summary>来源与待核条件 <span>查原文 ↓</span></summary>${entry.gaps?.length ? `<ul class="gap-list">${entry.gaps.map(gap => `<li>${escapeHtml(gap)}</li>`).join('')}</ul>` : ''}<ul class="source-list">${sources.map(source => `<li><a href="${escapeHtml(safeExternalUrl(source.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.label || '查看原文')} ↗</a></li>`).join('')}</ul><p class="source-note">图中素材出处可在对应棋子、装备及天赋详情中查看。配队建议待实战与独立试读。</p></details>`;
     dialog.classList.add('is-quick-guide');
     dialog.scrollTop = 0;
     $('#detail-close').focus({ preventScroll: true });
@@ -132,6 +165,8 @@ function render() {
   $('#hero-filters').hidden = route.type !== 'hero';
   $('#reset').hidden = !route.q && !route.faction && !route.quality;
   $('#intro').classList.toggle('compact', Boolean(route.q || route.type !== 'all' || route.faction || route.quality));
+  $('#fit-planner').hidden = route.type !== 'artifact';
+  $('#fit-style').value = [...$('#fit-style').options].some(option => option.value === route.q) ? route.q : '';
   const results = searchCatalog(catalog.entries, route);
   if (route.type === 'all' && !route.q) results.sort((a,b) => (a.type === 'playstyle' ? 0 : a.type === 'combo' ? 1 : 2) - (b.type === 'playstyle' ? 0 : b.type === 'combo' ? 1 : 2));
   const shown = results.slice(0, visibleCount);
@@ -153,7 +188,8 @@ async function loadCatalog() {
     catalog = data;
     entryMap.clear(); counts.clear();
     catalog.entries.forEach(entry => entryMap.set(entry.id, entry));
-    for (const type of TYPES) counts.set(type.id, type.id === 'all' ? catalog.entries.length : catalog.entries.filter(entry => entry.type === type.id).length);
+    for (const type of TYPES) counts.set(type.id, type.id === 'all' ? catalog.entries.length : type.id === 'artifact' ? catalog.entries.filter(entry => entry.fit).length : catalog.entries.filter(entry => entry.type === type.id).length);
+    $('#fit-style').innerHTML = '<option value="">全部流派 / 按装备查</option>' + catalog.entries.filter(entry=>entry.type==='playstyle').map(entry=>`<option value="${escapeHtml(entry.quick.title)}">${escapeHtml(entry.quick.title)}</option>`).join('');
     $('#catalog-total').textContent = `${catalog.entries.length} 条可查资料`;
     $('#faction').innerHTML = '<option value="">全部阵营</option>' + [...new Set(catalog.entries.filter(entry => entry.type === 'hero').map(entry => entry.faction).filter(Boolean))].map(faction => `<option value="${escapeHtml(faction)}">${escapeHtml(faction)}</option>`).join('');
     render();
@@ -164,6 +200,8 @@ async function loadCatalog() {
 }
 
 document.addEventListener('click', event => {
+  const fitQuery=event.target.closest('[data-fit-query]');
+  if(fitQuery && !event.metaKey && !event.ctrlKey && !event.shiftKey && event.button===0) { event.preventDefault(); visibleCount=24; navigate({type:'artifact',q:fitQuery.dataset.fitQuery,id:''}); return; }
   const entry = event.target.closest('a[data-entry]');
   if (entry && !event.metaKey && !event.ctrlKey && !event.shiftKey && event.button === 0) { event.preventDefault(); navigate({ id: entry.dataset.entry }); return; }
   const type = event.target.closest('[data-type]');
@@ -180,6 +218,7 @@ document.addEventListener('click', event => {
 $('#search-form').addEventListener('submit', event => event.preventDefault());
 $('#search').addEventListener('input', event => { if (event.isComposing) return; visibleCount = 24; navigate({ q: event.target.value, id: '' }, true); });
 $('#search').addEventListener('compositionend', event => { visibleCount = 24; navigate({ q: event.target.value, id: '' }, true); });
+$('#fit-style').addEventListener('change',event=>{visibleCount=24;navigate({type:'artifact',q:event.target.value,id:''});});
 $('#faction').addEventListener('change', event => { visibleCount = 24; navigate({ faction: event.target.value, id: '' }); });
 $('#quality').addEventListener('change', event => { visibleCount = 24; navigate({ quality: event.target.value, id: '' }); });
 $('#reset').addEventListener('click', () => { visibleCount = 24; navigate({ q: '', faction: '', quality: '', id: '' }); });

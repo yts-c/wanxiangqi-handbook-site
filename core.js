@@ -2,6 +2,7 @@ export const TYPES = [
   { id: 'all', label: '全部内容', short: '全部', icon: '◈' },
   { id: 'playstyle', label: '流派一图流', short: '流派', icon: '▧' },
   { id: 'combo', label: '联动图解', short: '联动', icon: '⌘' },
+  { id: 'artifact', label: '神器怎么选', short: '神器', icon: '◆' },
   { id: 'player', label: '棋手图鉴', short: '棋手', icon: '♔' },
   { id: 'hero', label: '棋子图鉴', short: '棋子', icon: '♟' },
   { id: 'equipment', label: '装备图鉴', short: '装备', icon: '⚒' },
@@ -31,12 +32,17 @@ export function routeHash(route = {}) {
 export function searchCatalog(entries, route) {
   const terms = normalize(route.q).split(' ').filter(Boolean);
   return entries.filter(entry => {
-    if (route.type !== 'all' && entry.type !== route.type) return false;
+    if (route.type === 'artifact' ? !entry.fit : route.type !== 'all' && entry.type !== route.type) return false;
     if (route.type === 'hero' && route.faction && entry.faction !== route.faction) return false;
     if (route.type === 'hero' && route.quality && Number(entry.quality) !== Number(route.quality)) return false;
     const haystack = normalize([entry.name, entry.subtitle, entry.summary, entry.body, entry.searchText, ...(entry.tags || [])].join(' '));
     return terms.every(term => haystack.includes(term));
   }).sort((a, b) => {
+    if (route.type === 'artifact' && terms.length) {
+      const rank = entry => Math.min(9, ...(entry.fit?.playstyles || []).filter(style => terms.every(term => normalize(style.name).includes(term))).map(style => ({'先补':0,'成型后选':1,'配套再选':2}[style.priority] ?? 9)));
+      const difference = rank(a) - rank(b);
+      if (difference) return difference;
+    }
     if (!terms.length) return 0;
     const score = entry => terms.reduce((sum, term) => sum + (normalize(entry.name) === term ? 100 : normalize(entry.name).includes(term) ? 20 : 0), 0);
     return score(b) - score(a);

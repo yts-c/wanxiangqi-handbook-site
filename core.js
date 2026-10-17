@@ -1,11 +1,11 @@
 export const TYPES = [
   { id: 'all', label: '全部内容', short: '全部', icon: '◈' },
+  { id: 'playstyle', label: '流派一图流', short: '流派', icon: '▧' },
+  { id: 'combo', label: '联动图解', short: '联动', icon: '⌘' },
   { id: 'player', label: '棋手图鉴', short: '棋手', icon: '♔' },
   { id: 'hero', label: '棋子图鉴', short: '棋子', icon: '♟' },
   { id: 'equipment', label: '装备图鉴', short: '装备', icon: '⚒' },
   { id: 'talent', label: '天赋图鉴', short: '天赋', icon: '✦' },
-  { id: 'playstyle', label: '流派运营', short: '流派', icon: '▧' },
-  { id: 'combo', label: '小联动', short: '联动', icon: '⌘' },
 ];
 
 export function normalize(value) {
@@ -60,6 +60,19 @@ export function imageMarkup(entry, className = '') {
   const url = safeImageUrl(entry.image?.thumbnail);
   const glyph = entry.type === 'equipment' ? '器' : entry.type === 'talent' ? '赋' : entry.name.charAt(0);
   return `<span class="entry-media ${url ? 'has-image' : 'no-image'} ${escapeHtml(className)}"><span class="image-fallback" aria-hidden="true">${escapeHtml(glyph)}</span>${url ? `<img src="${escapeHtml(url)}" alt="${escapeHtml(entry.name)}" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : ''}</span>`;
+}
+
+export function quickGuideMarkup(entry, { lookup, href }) {
+  const guide = entry.quick;
+  if (!guide) return '';
+  const tile = (item, index) => {
+    const target = lookup(item.entryId);
+    if (!target) return '';
+    return `<a class="quick-person${index === 0 ? ' is-core' : ''}" href="${escapeHtml(href(target.id))}" data-entry="${escapeHtml(target.id)}">${imageMarkup(target)}<strong>${escapeHtml(target.name)}</strong><span>${escapeHtml(item.role || item.why)}</span></a>`;
+  };
+  const choices = (title, items) => items.length ? `<section class="quick-choice"><h2>${title}<small>按来牌选择</small></h2><div class="quick-items">${items.map((item) => tile(item, -1)).join('')}</div></section>` : '';
+  const steps = guide.stages || guide.steps || [];
+  return `<section class="quick-guide" aria-label="${escapeHtml(guide.title)}一图流"><section class="quick-cores"><h2><span>01</span> 核心看这里<small>点头像查规则</small></h2><div class="quick-lineup">${guide.core.map(tile).join('')}</div></section><div class="quick-engine" aria-label="配合关系">${guide.engine.map((text, index) => `${index ? '<b aria-hidden="true">→</b>' : ''}<span>${escapeHtml(text)}</span>`).join('')}</div><section class="quick-operations"><h2><span>02</span> ${guide.stages ? '照这三步运营' : '照这个顺序打'}</h2><ol class="quick-stages">${steps.map((step, index) => `<li><div class="step-number">${index + 1}</div><div><span class="step-phase">${escapeHtml(step.phase || '操作 ' + (index + 1))}</span><h3>${escapeHtml(step.title)}</h3><p>${escapeHtml(step.action)}</p></div></li>`).join('')}</ol></section>${guide.equipment.length || guide.talents.length ? `<div class="quick-loadout">${choices('装备方向',guide.equipment)}${choices('天赋可选',guide.talents)}</div>` : ''}<div class="quick-decisions"><p><strong>站位</strong>${escapeHtml(guide.positioning)}</p>${guide.pivot ? `<p><strong>缺牌 / 转型</strong>${escapeHtml(guide.pivot)}</p>` : ''}</div><aside class="quick-caution"><span aria-hidden="true">!</span><p><strong>记住这个坑</strong>${escapeHtml(guide.caution)}</p></aside><footer class="quick-footnote">规则参考 v1.6.1 · 核对至 2026.10.15 · 玩法待实战</footer></section>`;
 }
 
 export function markdownToHtml(markdown, { resolveLink = () => null, linkText = text => escapeHtml(text) } = {}) {

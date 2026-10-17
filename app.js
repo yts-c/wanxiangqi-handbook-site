@@ -1,4 +1,4 @@
-import { TYPES, parseRoute, routeHash, searchCatalog, escapeHtml, safeExternalUrl, markdownToHtml, imageMarkup } from './core.js';
+import { TYPES, parseRoute, routeHash, searchCatalog, escapeHtml, safeExternalUrl, markdownToHtml, imageMarkup, quickGuideMarkup } from './core.js';
 
 const $ = selector => document.querySelector(selector);
 let catalog = null, route = parseRoute(location.hash), visibleCount = 24, activeId = '', restoreFocus = null;
@@ -26,6 +26,11 @@ function paintNavigation() {
 
 function card(entry) {
   const info = typeInfo(entry.type);
+  if (entry.quick) {
+    const q = entry.quick;
+    const portraits = q.core.map(item => ({ ...item, target: entryMap.get(item.entryId) })).filter(item => item.target);
+    return `<article class="entry-card quick-card" data-type="${entry.type}"><div class="quick-card-label">${entry.type === 'playstyle' ? '一图流 · 运营路线' : '图解 · 小配合'}<span aria-hidden="true">↗</span></div><h3 class="card-title"><a href="${escapeHtml(detailLink(entry.id))}" data-entry="${escapeHtml(entry.id)}">${escapeHtml(q.title)}</a></h3><p class="quick-card-tagline">${escapeHtml(q.tagline)}</p><div class="quick-card-portraits">${portraits.map(item => `<a href="${escapeHtml(detailLink(item.target.id))}" data-entry="${escapeHtml(item.target.id)}">${imageMarkup(item.target)}<span>${escapeHtml(item.name)}</span><small>${escapeHtml(item.role)}</small></a>`).join('')}</div><div class="quick-card-engine">${q.engine.map(escapeHtml).join('<span aria-hidden="true"> → </span>')}</div><a class="quick-card-open" href="${escapeHtml(detailLink(entry.id))}" data-entry="${escapeHtml(entry.id)}">${entry.type === 'playstyle' ? '看核心与三步运营' : '看出牌顺序与站位'} <span aria-hidden="true">→</span></a></article>`;
+  }
   const glyph = entry.type === 'equipment' ? '器' : entry.type === 'combo' ? '联' : entry.type === 'playstyle' ? '阵' : entry.name.charAt(0);
   const subtitle = entry.subtitle || [entry.faction, entry.quality ? `${entry.quality}阶` : '', info.short].filter(Boolean).join(' · ');
   const visual = entry.image ? imageMarkup(entry) : ['combo','playstyle'].includes(entry.type) ? `<span class="entry-avatar" aria-hidden="true">${escapeHtml(glyph)}</span>` : imageMarkup(entry);
@@ -77,12 +82,23 @@ function renderDetail() {
     document.body.style.overflow = 'hidden';
   }
   if (!entry) {
+    dialog.classList.remove('is-quick-guide');
     $('#detail-article').innerHTML = '<div class="not-found"><h1 id="detail-title" class="detail-heading">未找到这个条目</h1><p>这条链接对应的资料可能已更新，可以返回目录按名称搜索。</p></div>';
     document.title = '未找到条目 · 万象棋手册';
     return;
   }
   const sources = (entry.sources || []).filter(source => safeExternalUrl(source.url));
   const related = (entry.related || []).map(id => entryMap.get(id)).filter(Boolean);
+  if (entry.quick) {
+    const body = markdownToHtml(entry.body, { resolveLink: resolveLocalLink, linkText: text => linkBodyText(text, entry) });
+    $('#detail-article').innerHTML = `<div class="detail-category">${entry.type === 'playstyle' ? '流派一图流' : '联动图解'} / QUICK PLAY</div><h1 id="detail-title" class="detail-heading">${escapeHtml(entry.quick.title)}</h1><p class="quick-tagline">${escapeHtml(entry.quick.tagline)}</p>${quickGuideMarkup(entry, { lookup: id => entryMap.get(id), href: detailLink })}<details class="full-guide"><summary>展开完整攻略与规则 <span>需要细节时再看 ↓</span></summary><div class="reader">${body}</div></details><details class="full-guide evidence-guide"><summary>来源与待核条件 <span>查原文 ↓</span></summary>${entry.gaps?.length ? `<ul class="gap-list">${entry.gaps.map(gap => `<li>${escapeHtml(gap)}</li>`).join('')}</ul>` : ''}<ul class="source-list">${sources.map(source => `<li><a href="${escapeHtml(safeExternalUrl(source.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.label || '查看原文')} ↗</a></li>`).join('')}</ul><p class="source-note">图中素材出处可在对应棋子、装备及天赋详情中查看。配队建议待实战与独立试读。</p></details>`;
+    dialog.classList.add('is-quick-guide');
+    dialog.scrollTop = 0;
+    $('#detail-close').focus({ preventScroll: true });
+    document.title = `${entry.quick.title} · 万象棋手册`;
+    return;
+  }
+  dialog.classList.remove('is-quick-guide');
   $('#detail-article').innerHTML = `<div class="detail-category">${typeInfo(entry.type).label} / FIELD GUIDE</div><h1 id="detail-title" class="detail-heading">${escapeHtml(entry.name)}</h1><p class="detail-subtitle">${escapeHtml(entry.subtitle || typeInfo(entry.type).label)}</p><div class="detail-version"><span>规则参考 ${escapeHtml(catalog.meta.version)}</span><span>资料核对 ${escapeHtml(catalog.meta.updatedAt)}</span><span>待实战与独立试读</span></div><div class="reader">${markdownToHtml(entry.body, { resolveLink: resolveLocalLink, linkText: text => linkBodyText(text, entry) })}</div>${entry.gaps?.length ? `<section class="detail-supplement"><h3>使用前，留意这些待核条件</h3><div class="gap-list"><ul>${entry.gaps.map(gap => `<li>${escapeHtml(gap)}</li>`).join('')}</ul></div></section>` : ''}${related.length ? `<section class="detail-supplement"><h3>顺着这条关系继续查</h3><div class="related-list">${related.map(other => `<a class="related-link" href="${escapeHtml(detailLink(other.id))}" data-entry="${escapeHtml(other.id)}">${escapeHtml(other.name)} <span aria-hidden="true">↗</span></a>`).join('')}</div><p class="source-note">相关条目来自正文提及的名称，配队仍需满足各自条件。</p></section>` : ''}${sources.length ? `<section class="detail-supplement"><h3>规则与玩法来源</h3><ul class="source-list">${sources.map(source => `<li><a href="${escapeHtml(safeExternalUrl(source.url))}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.label || '查看原文')} ↗</a></li>`).join('')}</ul></section>` : ''}`;
   const heading = $('#detail-title');
   if (entry.image) {
@@ -117,6 +133,7 @@ function render() {
   $('#reset').hidden = !route.q && !route.faction && !route.quality;
   $('#intro').classList.toggle('compact', Boolean(route.q || route.type !== 'all' || route.faction || route.quality));
   const results = searchCatalog(catalog.entries, route);
+  if (route.type === 'all' && !route.q) results.sort((a,b) => (a.type === 'playstyle' ? 0 : a.type === 'combo' ? 1 : 2) - (b.type === 'playstyle' ? 0 : b.type === 'combo' ? 1 : 2));
   const shown = results.slice(0, visibleCount);
   $('#results').innerHTML = shown.map(card).join('');
   $('#result-status').textContent = `找到 ${results.length} 条内容${shown.length < results.length ? ` · 已展示 ${shown.length} 条` : ''}${route.q ? ` · “${route.q}”` : ''}`;
